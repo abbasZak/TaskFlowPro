@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import TaskFlowLogo from '../assets/images/TaskFlowLogo-removebg-preview.png';
 import { FiEye, FiEyeOff } from 'react-icons/fi';
 import { auth } from '../config/firebaseConfig';
-import { createUserWithEmailAndPassword, sendEmailVerification } from 'firebase/auth';
+import { createUserWithEmailAndPassword, sendEmailVerification, updateProfile } from 'firebase/auth';
 import { useAuth } from './context/useAuth';
 import { useNavigate } from 'react-router-dom';
 
@@ -113,6 +113,10 @@ async function handleSubmitButton(e: React.FormEvent) {
         
         // Update form data
         setFormData(dataToSave);
+
+        await updateProfile(user, {
+            displayName: `${formData.firstName} ${formData.lastName}`
+        })
 
         // Small delay to ensure state is updated before navigation
         setTimeout(() => {

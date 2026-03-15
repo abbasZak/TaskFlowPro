@@ -6,6 +6,7 @@ import { FullRegistration } from './components/FullRegistration';
 import { Routes, Route } from 'react-router-dom';
 import Login from './components/Login';
 import Dashboard from './components/Dashboard';
+import TaskManagement from './components/TaskManagement';
 
 function App() {
   
@@ -19,6 +20,9 @@ function App() {
               <Route path='/verify-success' element={<ConfirmationSuccessful />}></Route>
               <Route path='/Login' element={<Login />}></Route>
               <Route path='/' element={<Dashboard />}></Route>
+              <Route path='/projectPage/:id' element={<TaskManagement />}></Route>
+
+
 
           </Routes>
           

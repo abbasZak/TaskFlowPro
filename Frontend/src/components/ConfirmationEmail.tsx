@@ -3,6 +3,7 @@ import { FiMail, FiArrowLeft, FiCheckCircle, FiRefreshCw } from 'react-icons/fi'
 import { useNavigate } from 'react-router-dom';
 import { auth } from '../config/firebaseConfig';
 import { sendEmailVerification } from 'firebase/auth';
+import { useAuth } from './context/useAuth';
 
 export const ConfirmationEmail = () => {
     const [email, setEmail] = useState('');
@@ -10,6 +11,7 @@ export const ConfirmationEmail = () => {
     const [countdown, setCountdown] = useState(0);
     const [showSuccess, setShowSuccess] = useState(false);
     const navigate = useNavigate();
+    const { setStep } = useAuth();
 
     useEffect(() => {
         // Get the user's email from auth

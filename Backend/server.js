@@ -5,27 +5,19 @@ const cors = require('cors');
 const app = express();  
 const PORT = process.env.PORT || 5001;
 
+
 // Import database connections
 console.log('Initializing database connections...');
 const mysqlDb = require('./config/mysql/db'); // Make sure this path is correct
 const { admin, firestore } = require('./config/firebase');
 
-// Make mysqlDb available globally (for routes that need it)
-app.locals.mysqlDb = mysqlDb;
 
-// Verify Firebase Admin is initialized
-console.log('Firebase Admin initialized:', !!admin);
-console.log('Firestore initialized:', !!firestore);
-
-// Verify MySQL connection
-if (mysqlDb) {
-    console.log('✅ MySQL configured');
-} else {
-    console.error('❌ MySQL not configured properly');
-}
 
 // Routes import
 const authRoute = require("./routes/authRoute.js");
+const protectedRoute = require("./routes/protectedRoutes.js");
+const projectRoute = require("./routes/projectRoute.js");
+const userRoute = require("./routes/userRoute.js");
 
 // Middlewares
 app.use(cors({
@@ -99,6 +91,9 @@ app.get('/', (req, res) => {
 });
 
 app.use("/api/auth", authRoute);
+app.use("/api/protected", protectedRoute);
+app.use('/api/project', projectRoute);
+app.use('/api/user', userRoute);
 
 // 404 handler
 app.use((req, res) => {

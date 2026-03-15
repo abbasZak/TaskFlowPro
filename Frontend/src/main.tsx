@@ -4,14 +4,17 @@ import { BrowserRouter } from 'react-router-dom'
 import './index.css'
 import App from './App.tsx'
 import { AuthProvider } from './components/context/AuthProvider.tsx'
-
+import { SnackbarProvider } from 'notistack'
 
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <BrowserRouter>
       <AuthProvider>
-          <App />
+        <SnackbarProvider>
+            <App />
+        </SnackbarProvider>
+          
       </AuthProvider>
       
     </BrowserRouter>
