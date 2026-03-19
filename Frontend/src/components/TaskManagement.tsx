@@ -17,76 +17,12 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { DndProvider, useDrag, useDrop } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import { useParams, useNavigate } from 'react-router-dom';
-
-
-// Types
-interface Task {
-    id: string;
-    title: string;
-    description: string;
-    status: 'todo' | 'in-progress' | 'review' | 'done';
-    priority: 'urgent' | 'high' | 'medium' | 'low';
-    assignee?: TeamMember;
-    dueDate: string;
-    tags: string[];
-    attachments: number;
-    comments: number;
-    createdAt: string;
-    completedAt?: string;
-    recurring?: 'daily' | 'weekly' | 'monthly' | 'none';
-    isTemplate?: boolean;
-    estimatedHours?: number;
-    actualHours?: number;
-}
-
-interface TeamMember {
-    id: string;
-    name: string;
-    email: string;
-    avatar: string;
-    role: 'Owner' | 'Admin' | 'Member';
-    status: 'active' | 'inactive' | 'pending';
-    performance: {
-        tasksCompleted: number;
-        tasksAssigned: number;
-        onTimeRate: number;
-    };
-    joinedAt: string;
-    lastActive: string;
-}
-
-interface Project {
-    id: string;
-    name: string;
-    description: string;
-    owner: TeamMember;
-    admins: TeamMember[];
-    members: TeamMember[];
-    budget?: number;
-    spent?: number;
-    timeline: {
-        start: string;
-        end: string;
-        milestones: Milestone[];
-    };
-    goals: Goal[];
-    status: 'active' | 'archived' | 'completed';
-}
-
-interface Milestone {
-    id: string;
-    title: string;
-    date: string;
-    completed: boolean;
-}
-
-interface Goal {
-    id: string;
-    title: string;
-    target: number;
-    current: number;
-    unit: string;
-}
+import axios from 'axios';
+import { auth } from '../config/firebaseConfig';
+import { enqueueSnackbar } from 'notistack';
+import TeamMemberCard from './TeamMemberCard';
+import type { TeamMember, Project, Task } from '../types/TaskManagement';
+import TaskCard from './TaskCard.';
 
 // Mock Data
 const mockTeamMembers: TeamMember[] = [
@@ -275,109 +211,7 @@ const mockProject: Project = {
 };
 
 // Task Card Component - Fixed with type assertion
-const TaskCard: React.FC<{ task: Task; onEdit: (task: Task) => void; onDelete: (id: string) => void }> = ({ task, onEdit, onDelete }) => {
-    const [{ isDragging }, drag] = useDrag(() => ({
-        type: 'TASK',
-        item: { id: task.id },
-        collect: (monitor) => ({
-            isDragging: !!monitor.isDragging(),
-        }),
-    }));
 
-    const priorityColors = {
-        urgent: 'bg-red-100 text-red-600 dark:bg-red-900/20 dark:text-red-400',
-        high: 'bg-orange-100 text-orange-600 dark:bg-orange-900/20 dark:text-orange-400',
-        medium: 'bg-yellow-100 text-yellow-600 dark:bg-yellow-900/20 dark:text-yellow-400',
-        low: 'bg-green-100 text-green-600 dark:bg-green-900/20 dark:text-green-400'
-    };
-
-     
-
-    return (
-        <motion.div
-            ref={drag as any}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.9 }}
-            className={`bg-white dark:bg-gray-800 rounded-xl shadow-lg p-4 mb-3 cursor-move border-l-4 ${
-                task.priority === 'urgent' ? 'border-red-500' :
-                task.priority === 'high' ? 'border-orange-500' :
-                task.priority === 'medium' ? 'border-yellow-500' :
-                'border-green-500'
-            } ${isDragging ? 'opacity-50' : ''}`}
-            whileHover={{ scale: 1.02, boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)' }}
-        >
-            {/* Rest of the component remains the same */}
-            <div className="flex items-start justify-between mb-2">
-                <h4 className="font-semibold text-gray-800 dark:text-white">{task.title}</h4>
-                <div className="flex items-center gap-1">
-                    <button 
-                        onClick={() => onEdit(task)}
-                        className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
-                    >
-                        <FiEdit2 size={14} className="text-gray-500" />
-                    </button>
-                    <button 
-                        onClick={() => onDelete(task.id)}
-                        className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
-                    >
-                        <FiTrash2 size={14} className="text-gray-500" />
-                    </button>
-                </div>
-            </div>
-            
-            <p className="text-sm text-gray-500 dark:text-gray-400 mb-3 line-clamp-2">
-                {task.description}
-            </p>
-            
-            <div className="flex items-center gap-2 mb-3">
-                <span className={`text-xs px-2 py-1 rounded-full ${priorityColors[task.priority]}`}>
-                    {task.priority}
-                </span>
-                {task.tags.map((tag, index) => (
-                    <span key={index} className="text-xs px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
-                        #{tag}
-                    </span>
-                ))}
-            </div>
-            
-            <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                    {task.assignee && (
-                        <img 
-                            src={task.assignee.avatar} 
-                            alt={task.assignee.name}
-                            className="w-6 h-6 rounded-full border-2 border-white dark:border-gray-800"
-                            title={task.assignee.name}
-                        />
-                    )}
-                    <div className="flex items-center gap-1 text-gray-500 text-xs">
-                        <FiCalendar size={12} />
-                        <span>{new Date(task.dueDate).toLocaleDateString()}</span>
-                    </div>
-                </div>
-                
-                <div className="flex items-center gap-2 text-gray-400 text-xs">
-                    {task.attachments > 0 && (
-                        <span className="flex items-center gap-1">
-                            <FiPaperclip size={12} />
-                            {task.attachments}
-                        </span>
-                    )}
-                    {task.comments > 0 && (
-                        <span className="flex items-center gap-1">
-                            <FiMessageCircle size={12} />
-                            {task.comments}
-                        </span>
-                    )}
-                    {task.recurring && task.recurring !== 'none' && (
-                        <FiRepeat size={12} className="text-blue-500" />
-                    )}
-                </div>
-            </div>
-        </motion.div>
-    );
-};
 
 // Column Component - Fixed with type assertion
 const Column: React.FC<{ 
@@ -447,145 +281,7 @@ const Column: React.FC<{
 };
 
 // Team Member Card Component
-const TeamMemberCard: React.FC<{ 
-    member: TeamMember; 
-    currentUserRole: string;
-    onRoleChange: (memberId: string, newRole: TeamMember['role']) => void;
-    onStatusToggle: (memberId: string) => void;
-    onRemove: (memberId: string) => void;
-    onResendInvite: (memberId: string) => void;
-}> = ({ member, currentUserRole, onRoleChange, onStatusToggle, onRemove, onResendInvite }) => {
-    const [showActions, setShowActions] = useState(false);
-    
-    const roleColors = {
-        Owner: 'bg-purple-100 text-purple-600 dark:bg-purple-900/20 dark:text-purple-400',
-        Admin: 'bg-blue-100 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400',
-        Member: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300'
-    };
-    
-    const statusColors = {
-        active: 'bg-green-100 text-green-600 dark:bg-green-900/20 dark:text-green-400',
-        inactive: 'bg-red-100 text-red-600 dark:bg-red-900/20 dark:text-red-400',
-        pending: 'bg-yellow-100 text-yellow-600 dark:bg-yellow-900/20 dark:text-yellow-400'
-    };
 
-    return (
-        <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.9 }}
-            className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 hover:shadow-xl transition-all"
-        >
-            <div className="flex items-start justify-between mb-4">
-                <div className="flex items-center gap-4">
-                    <img 
-                        src={member.avatar} 
-                        alt={member.name}
-                        className="w-16 h-16 rounded-full border-4 border-[#6747ce]/20"
-                    />
-                    <div>
-                        <h3 className="text-lg font-semibold dark:text-white">{member.name}</h3>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">{member.email}</p>
-                        <div className="flex items-center gap-2 mt-2">
-                            <span className={`text-xs px-2 py-1 rounded-full ${roleColors[member.role]}`}>
-                                {member.role}
-                            </span>
-                            <span className={`text-xs px-2 py-1 rounded-full ${statusColors[member.status]}`}>
-                                {member.status}
-                            </span>
-                        </div>
-                    </div>
-                </div>
-                
-                {(currentUserRole === 'Owner' || currentUserRole === 'Admin') && (
-                    <div className="relative">
-                        <button 
-                            onClick={() => setShowActions(!showActions)}
-                            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
-                        >
-                            <FiMoreVertical size={18} className="text-gray-500" />
-                        </button>
-                        
-                        <AnimatePresence>
-                            {showActions && (
-                                <motion.div
-                                    initial={{ opacity: 0, scale: 0.9, y: -10 }}
-                                    animate={{ opacity: 1, scale: 1, y: 0 }}
-                                    exit={{ opacity: 0, scale: 0.9, y: -10 }}
-                                    className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-xl border dark:border-gray-700 z-10"
-                                >
-                                    <div className="py-1">
-                                        {currentUserRole === 'Owner' && (
-                                            <>
-                                                <button
-                                                    onClick={() => onRoleChange(member.id, 'Admin')}
-                                                    className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 dark:text-gray-300"
-                                                >
-                                                    Make Admin
-                                                </button>
-                                                <button
-                                                    onClick={() => onRoleChange(member.id, 'Member')}
-                                                    className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 dark:text-gray-300"
-                                                >
-                                                    Make Member
-                                                </button>
-                                            </>
-                                        )}
-                                        
-                                        <button
-                                            onClick={() => onStatusToggle(member.id)}
-                                            className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 dark:text-gray-300"
-                                        >
-                                            {member.status === 'active' ? 'Deactivate' : 'Activate'}
-                                        </button>
-                                        
-                                        {member.status === 'pending' && (
-                                            <button
-                                                onClick={() => onResendInvite(member.id)}
-                                                className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 dark:text-gray-300"
-                                            >
-                                                Resend Invite
-                                            </button>
-                                        )}
-                                        
-                                        {(currentUserRole === 'Owner' || member.role !== 'Owner') && (
-                                            <button
-                                                onClick={() => onRemove(member.id)}
-                                                className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100 dark:hover:bg-gray-700"
-                                            >
-                                                Remove Member
-                                            </button>
-                                        )}
-                                    </div>
-                                </motion.div>
-                            )}
-                        </AnimatePresence>
-                    </div>
-                )}
-            </div>
-            
-            <div className="grid grid-cols-3 gap-4 mb-4">
-                <div className="text-center">
-                    <p className="text-2xl font-bold text-[#6747ce]">{member.performance.tasksCompleted}</p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">Completed</p>
-                </div>
-                <div className="text-center">
-                    <p className="text-2xl font-bold text-[#6747ce]">{member.performance.tasksAssigned}</p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">Assigned</p>
-                </div>
-                <div className="text-center">
-                    <p className="text-2xl font-bold text-[#6747ce]">{member.performance.onTimeRate}%</p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">On Time</p>
-                </div>
-            </div>
-            
-            <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400 pt-4 border-t dark:border-gray-700">
-                <span>Joined {new Date(member.joinedAt).toLocaleDateString()}</span>
-                <span>Last active {new Date(member.lastActive).toLocaleDateString()}</span>
-            </div>
-        </motion.div>
-    );
-};
 
 // Main Component
 const TaskManagement: React.FC = () => {
@@ -604,6 +300,10 @@ const TaskManagement: React.FC = () => {
     const [selectedTasks, setSelectedTasks] = useState<string[]>([]);
     const [editingTask, setEditingTask] = useState<Task | null>(null);
     const [currentUserRole] = useState<'Owner' | 'Admin' | 'Member'>('Owner');
+    
+
+    // Api Url 
+    const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5001";
 
     // Task Management Functions
     const handleTaskMove = (taskId: string, newStatus: Task['status']) => {
@@ -613,6 +313,8 @@ const TaskManagement: React.FC = () => {
                 : task
         ));
     };
+
+    
 
     const handleCreateTask = (taskData: Partial<Task>) => {
         const newTask: Task = {
@@ -673,26 +375,80 @@ const TaskManagement: React.FC = () => {
         ));
     };
 
+    useEffect(() => {
+        const user = auth.currentUser;
+        user?.getIdToken().then((token) => console.log(token))
+       console.log(user)
+    }, [])
+
     // Team Management Functions
-    const handleInviteMember = (email: string, role: TeamMember['role']) => {
-        const newMember: TeamMember = {
-            id: Date.now().toString(),
-            name: email.split('@')[0],
-            email,
-            avatar: `https://i.pravatar.cc/150?img=${Math.floor(Math.random() * 70)}`,
-            role,
-            status: 'pending',
-            performance: {
-                tasksCompleted: 0,
-                tasksAssigned: 0,
-                onTimeRate: 0
-            },
-            joinedAt: new Date().toISOString().split('T')[0],
-            lastActive: new Date().toISOString().split('T')[0]
+    // Team Management Functions
+const handleInviteMember = async (email: string, role: string) => {
+    console.log('handleInviteMember called with:', { email, role }); // Add this
+    console.log('Project ID from useParams:', id); // Add this
+    
+    try {
+        const user = auth.currentUser;
+        console.log('Current user:', user); // Add this
+        
+        if (!user) {
+            enqueueSnackbar('You must be logged in to send invites', { variant: "error" });
+            return;
+        }
+
+        const token = await user.getIdToken();
+        console.log('Got token:', token ? 'Yes' : 'No'); // Add this
+        
+        // Make sure id is available from useParams
+        if (!id) {
+            enqueueSnackbar('Project ID not found', { variant: "error" });
+            return;
+        }
+
+        const inviteData = {
+            email: email,
+            role: role
         };
-        setTeamMembers(prev => [...prev, newMember]);
-        setShowInviteModal(false);
-    };
+
+        console.log('Sending invite with data:', inviteData);
+        console.log('Project ID:', id);
+        console.log('API URL:', `${API_URL}/api/invitation/${id}/sendInvitation`);
+
+        const response = await axios.post(
+            `${API_URL}/api/invitation/${id}/sendInvitation`, 
+            inviteData,
+            {
+                headers: {
+                    "Authorization": `Bearer ${token}`,
+                    "Content-Type": "application/json"
+                }
+            }
+        );
+
+        console.log('Response:', response.data); // Add this
+
+        if (response.data && response.data.success) {
+            enqueueSnackbar(response.data.message || 'Invite Sent Successfully', { variant: "success" });
+            setShowInviteModal(false);
+        }
+    } catch(err: any) {
+        console.error('Error sending invitation:', err);
+        
+        if (err.response) {
+            console.error('Error response data:', err.response.data);
+            console.error('Error response status:', err.response.status);
+            console.error('Error response headers:', err.response.headers);
+            
+            const errorMessage = err.response.data?.message || err.response.data?.error || 'Failed to send invitation';
+            enqueueSnackbar(errorMessage, { variant: "error" });
+        } else if (err.request) {
+            console.error('Error request:', err.request);
+            enqueueSnackbar('No response from server. Please check your connection.', { variant: "error" });
+        } else {
+            enqueueSnackbar(err.message || 'An unexpected error occurred', { variant: "error" });
+        }
+    }
+};
 
     const handleRoleChange = (memberId: string, newRole: TeamMember['role']) => {
         setTeamMembers(prev => prev.map(member => 
@@ -795,6 +551,7 @@ const TaskManagement: React.FC = () => {
         return dueDate < today && t.status !== 'done';
     }).length;
 
+    // Prject Id 
     const { id } = useParams();
     const navigate = useNavigate();
 
@@ -1595,7 +1352,7 @@ const TaskModal: React.FC<{
         isTemplate: task?.isTemplate || false
     });
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const addTasks = (e: React.FormEvent) => {
         e.preventDefault();
         
         const assignee = teamMembers.find(m => m.id === formData.assigneeId);
@@ -1638,7 +1395,7 @@ const TaskModal: React.FC<{
                     {task ? 'Edit Task' : 'Create New Task'}
                 </h2>
                 
-                <form onSubmit={handleSubmit} className="space-y-4">
+                <form onSubmit={addTasks} className="space-y-4">
                     <div>
                         <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
                             Title
@@ -1847,14 +1604,15 @@ const TaskModal: React.FC<{
 
 const InviteModal: React.FC<{
     darkMode: boolean;
-    onClose: () => void;
     onInvite: (email: string, role: TeamMember['role']) => void;
+    onClose: () => void;
 }> = ({ darkMode, onClose, onInvite }) => {
     const [email, setEmail] = useState('');
     const [role, setRole] = useState<TeamMember['role']>('Member');
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const inviteMember = (e: React.FormEvent) => {
         e.preventDefault();
+        console.log('Invite form submitted with:', { email, role }); // Add this debug line
         onInvite(email, role);
     };
 
@@ -1877,10 +1635,10 @@ const InviteModal: React.FC<{
                     Invite Team Member
                 </h2>
                 
-                <form onSubmit={handleSubmit} className="space-y-4">
+                <form onSubmit={inviteMember} className="space-y-4">
                     <div>
                         <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                            Email Address
+                            Email Address <span className="text-red-500">*</span>
                         </label>
                         <input
                             type="email"
@@ -1898,7 +1656,7 @@ const InviteModal: React.FC<{
                     
                     <div>
                         <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                            Role
+                            Role <span className="text-red-500">*</span>
                         </label>
                         <select
                             value={role}
@@ -2128,6 +1886,9 @@ const TransferOwnershipModal: React.FC<{
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
+
+        
+
         if (selectedOwnerId) {
             onTransfer(selectedOwnerId);
         }

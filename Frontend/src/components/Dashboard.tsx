@@ -631,7 +631,7 @@ const Dashboard: React.FC = () => {
 
     // Auth effect with cleanup
     useEffect(() => {
-        auth.currentUser?.getIdToken().then((token) => console.log(token)); 
+        //auth.currentUser?.getIdToken().then((token) => console.log(token)); 
         
 
         let isMounted = true;

@@ -18,6 +18,7 @@ const authRoute = require("./routes/authRoute.js");
 const protectedRoute = require("./routes/protectedRoutes.js");
 const projectRoute = require("./routes/projectRoute.js");
 const userRoute = require("./routes/userRoute.js");
+const invitationRoute = require("./routes/invitationRoute.js");
 
 // Middlewares
 app.use(cors({
@@ -94,7 +95,7 @@ app.use("/api/auth", authRoute);
 app.use("/api/protected", protectedRoute);
 app.use('/api/project', projectRoute);
 app.use('/api/user', userRoute);
-
+app.use("/api/invitation", invitationRoute)
 // 404 handler
 app.use((req, res) => {
     res.status(404).json({ message: 'Route not found' });

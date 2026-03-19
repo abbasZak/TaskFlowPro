@@ -6,6 +6,7 @@ import { auth } from '../config/firebaseConfig';
 import { createUserWithEmailAndPassword, sendEmailVerification, updateProfile } from 'firebase/auth';
 import { useAuth } from './context/useAuth';
 import { useNavigate } from 'react-router-dom';
+import { enqueueSnackbar } from 'notistack';
 
 const Register = () => {
     const [showPassword, setShowPassword] = useState(false);
@@ -66,7 +67,7 @@ async function handleSubmitButton(e: React.FormEvent) {
 
     // Safe validation with optional chaining
     if (!formData?.email || !formData?.password || !formData?.firstName || !formData?.lastName || !formData?.username) {
-        setError('Please fill in all fields');
+        enqueueSnackbar("Please fill in all fields", {variant: "error"});
         setIsLoading(false);
         return;
     }
@@ -74,14 +75,15 @@ async function handleSubmitButton(e: React.FormEvent) {
     // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(formData.email)) {
-        setError('Please enter a valid email address');
+        enqueueSnackbar("Please enter a valid email address", {variant: "error"});
+        
         setIsLoading(false);
         return;
     }
 
     // Validate password length
     if (formData.password.length < 6) {
-        setError('Password must be at least 6 characters long');
+        enqueueSnackbar("Password must be at least 6 characters long", {variant: "error"});
         setIsLoading(false);
         return;
     }
@@ -128,16 +130,17 @@ async function handleSubmitButton(e: React.FormEvent) {
         // Handle specific Firebase errors
         switch (err.code) {
             case 'auth/email-already-in-use':
-                setError('This email is already registered. Please login instead.');
+                enqueueSnackbar("This email is already registered. Please login instead.", {variant: "error"});
                 break;
             case 'auth/invalid-email':
-                setError('Please enter a valid email address.');
+                enqueueSnackbar("Please enter a valid email address.", {variant: "error"});
                 break;
             case 'auth/weak-password':
-                setError('Password should be at least 6 characters.');
+                enqueueSnackbar("Password should be at least 6 characters..", {variant: "error"});
                 break;
             default:
-                setError(`An error occurred: ${err.message || 'Please try again.'}`);
+                enqueueSnackbar("An error occured..", {variant: "error"});
+                
         }
     } finally {
         setIsLoading(false);
