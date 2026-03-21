@@ -21,9 +21,10 @@ import axios from 'axios';
 import { auth } from '../config/firebaseConfig';
 import { enqueueSnackbar } from 'notistack';
 import TeamMemberCard from './TeamMemberCard';
-import type { TeamMember, Project, Task } from '../types/TaskManagement';
-import TaskCard from './TaskCard.';
-
+import type { TeamMember, Project, Task, InviteModalProps } from '../types/TaskManagement';
+import Column from './Column';
+import { onAuthStateChanged } from 'firebase/auth';
+import type { User } from "firebase/auth";
 // Mock Data
 const mockTeamMembers: TeamMember[] = [
     {
@@ -210,75 +211,9 @@ const mockProject: Project = {
     status: 'active'
 };
 
-// Task Card Component - Fixed with type assertion
 
 
-// Column Component - Fixed with type assertion
-const Column: React.FC<{ 
-    title: string; 
-    status: Task['status']; 
-    tasks: Task[];
-    onTaskMove: (taskId: string, newStatus: Task['status']) => void;
-    onEditTask: (task: Task) => void;
-    onDeleteTask: (id: string) => void;
-}> = ({ title, status, tasks, onTaskMove, onEditTask, onDeleteTask }) => {
-    const [{ isOver }, drop] = useDrop(() => ({
-        accept: 'TASK',
-        drop: (item: { id: string }) => onTaskMove(item.id, status),
-        collect: (monitor) => ({
-            isOver: !!monitor.isOver(),
-        }),
-    }));
 
-    const columnColors = {
-        todo: 'bg-gray-100 dark:bg-gray-800/50',
-        'in-progress': 'bg-blue-50 dark:bg-blue-900/20',
-        review: 'bg-yellow-50 dark:bg-yellow-900/20',
-        done: 'bg-green-50 dark:bg-green-900/20'
-    };
-
-    const headerColors = {
-        todo: 'text-gray-600 dark:text-gray-400',
-        'in-progress': 'text-blue-600 dark:text-blue-400',
-        review: 'text-yellow-600 dark:text-yellow-400',
-        done: 'text-green-600 dark:text-green-400'
-    };
-
-    return (
-        <div
-            ref={drop as any}
-            className={`flex-1 min-w-[280px] rounded-xl p-4 ${columnColors[status]} ${isOver ? 'ring-2 ring-[#6747ce]' : ''}`}
-        >
-            <div className="flex items-center justify-between mb-4">
-                <h3 className={`font-semibold ${headerColors[status]}`}>
-                    {title} ({tasks.length})
-                </h3>
-                <button className="p-1 hover:bg-white dark:hover:bg-gray-700 rounded">
-                    <FiMoreVertical size={16} className="text-gray-500" />
-                </button>
-            </div>
-            
-            <div className="space-y-3 max-h-[calc(100vh-300px)] overflow-y-auto custom-scrollbar">
-                <AnimatePresence>
-                    {tasks.map(task => (
-                        <TaskCard 
-                            key={task.id} 
-                            task={task} 
-                            onEdit={onEditTask}
-                            onDelete={onDeleteTask}
-                        />
-                    ))}
-                </AnimatePresence>
-                
-                {tasks.length === 0 && (
-                    <div className="text-center py-8 text-gray-400 dark:text-gray-600">
-                        No tasks yet
-                    </div>
-                )}
-            </div>
-        </div>
-    );
-};
 
 // Team Member Card Component
 
@@ -289,7 +224,7 @@ const TaskManagement: React.FC = () => {
     const [activeTab, setActiveTab] = useState<'tasks' | 'team' | 'analytics' | 'settings'>('tasks');
     const [selectedProject, setSelectedProject] = useState<Project>(mockProject);
     const [tasks, setTasks] = useState<Task[]>(mockTasks);
-    const [teamMembers, setTeamMembers] = useState<TeamMember[]>(mockTeamMembers);
+    const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
     const [showNewTaskModal, setShowNewTaskModal] = useState(false);
     const [showInviteModal, setShowInviteModal] = useState(false);
     const [showBulkEditModal, setShowBulkEditModal] = useState(false);
@@ -300,7 +235,9 @@ const TaskManagement: React.FC = () => {
     const [selectedTasks, setSelectedTasks] = useState<string[]>([]);
     const [editingTask, setEditingTask] = useState<Task | null>(null);
     const [currentUserRole] = useState<'Owner' | 'Admin' | 'Member'>('Owner');
-    
+    const [user, setUser] = useState<User | null>(null);
+    const [loading, setLoading] = useState<boolean>(true);
+    const [isInviting, setIsInviting] = useState(false);
 
     // Api Url 
     const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5001";
@@ -369,86 +306,131 @@ const TaskManagement: React.FC = () => {
         }
     };
 
+    
+
     const handleSetRecurring = (taskId: string, recurring: Task['recurring']) => {
         setTasks(prev => prev.map(task => 
             task.id === taskId ? { ...task, recurring } : task
         ));
     };
 
-    useEffect(() => {
-        const user = auth.currentUser;
-        user?.getIdToken().then((token) => console.log(token))
-       console.log(user)
-    }, [])
+useEffect(() => {
+    setLoading(true); // Set loading to true when starting
+    
+    // Set up auth state observer
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+        console.log('Auth state changed:', firebaseUser);
+        setUser(firebaseUser);
+        setLoading(false); // Set to false when auth is resolved
+        
+        if (firebaseUser) {
+            firebaseUser.getIdToken().then((token) => {
+                console.log('User token:', token);
+            });
+        }
+    });
 
-    // Team Management Functions
+    // Cleanup subscription
+    return () => unsubscribe();
+}, []);
+
     // Team Management Functions
 const handleInviteMember = async (email: string, role: string) => {
-    console.log('handleInviteMember called with:', { email, role }); // Add this
-    console.log('Project ID from useParams:', id); // Add this
-    
-    try {
-        const user = auth.currentUser;
-        console.log('Current user:', user); // Add this
+        console.log('handleInviteMember called with:', { email, role });
+        console.log('Project ID from useParams:', id);
         
-        if (!user) {
-            enqueueSnackbar('You must be logged in to send invites', { variant: "error" });
-            return;
-        }
-
-        const token = await user.getIdToken();
-        console.log('Got token:', token ? 'Yes' : 'No'); // Add this
+        setIsInviting(true); // Set loading to true
         
-        // Make sure id is available from useParams
-        if (!id) {
-            enqueueSnackbar('Project ID not found', { variant: "error" });
-            return;
-        }
-
-        const inviteData = {
-            email: email,
-            role: role
-        };
-
-        console.log('Sending invite with data:', inviteData);
-        console.log('Project ID:', id);
-        console.log('API URL:', `${API_URL}/api/invitation/${id}/sendInvitation`);
-
-        const response = await axios.post(
-            `${API_URL}/api/invitation/${id}/sendInvitation`, 
-            inviteData,
-            {
-                headers: {
-                    "Authorization": `Bearer ${token}`,
-                    "Content-Type": "application/json"
-                }
-            }
-        );
-
-        console.log('Response:', response.data); // Add this
-
-        if (response.data && response.data.success) {
-            enqueueSnackbar(response.data.message || 'Invite Sent Successfully', { variant: "success" });
-            setShowInviteModal(false);
-        }
-    } catch(err: any) {
-        console.error('Error sending invitation:', err);
-        
-        if (err.response) {
-            console.error('Error response data:', err.response.data);
-            console.error('Error response status:', err.response.status);
-            console.error('Error response headers:', err.response.headers);
+        try {
+            console.log('Current user from state:', user);
             
-            const errorMessage = err.response.data?.message || err.response.data?.error || 'Failed to send invitation';
-            enqueueSnackbar(errorMessage, { variant: "error" });
-        } else if (err.request) {
-            console.error('Error request:', err.request);
-            enqueueSnackbar('No response from server. Please check your connection.', { variant: "error" });
-        } else {
-            enqueueSnackbar(err.message || 'An unexpected error occurred', { variant: "error" });
+            // Check if still loading
+            if (loading) {
+                enqueueSnackbar('Authentication is still loading. Please wait.', { variant: "info" });
+                return;
+            }
+            
+            if (!user) {
+                enqueueSnackbar('You must be logged in to send invites', { variant: "error" });
+                return;
+            }
+
+            const token = await user.getIdToken();
+            console.log('Got token:', token ? 'Yes' : 'No');
+            
+            // Make sure id is available from useParams
+            if (!id) {
+                enqueueSnackbar('Project ID not found', { variant: "error" });
+                return;
+            }
+
+            const inviteData = {
+                email: email,
+                role: role
+            };
+
+            console.log('Sending invite with data:', inviteData);
+            console.log('Project ID:', id);
+            console.log('API URL:', `${API_URL}/api/invitation/${id}/sendInvitation`);
+
+            const response = await axios.post(
+                `${API_URL}/api/invitation/${id}/sendInvitation`, 
+                inviteData,
+                {
+                    headers: {
+                        "Authorization": `Bearer ${token}`,
+                        "Content-Type": "application/json"
+                    }
+                }
+            );
+
+            console.log('Response:', response.data);
+
+            // Check for success in different possible response formats
+            if (response.status === 200 || response.status === 201) {
+                // Show success message
+                const successMessage = response.data?.message || 'Invitation sent successfully';
+                enqueueSnackbar(successMessage, { variant: "success" });
+                
+                // Close the modal
+                setShowInviteModal(false);
+                
+                // Optional: Refresh team members list or show pending invitation
+                // You might want to add the invited user to the teamMembers list with status 'pending'
+                // or refresh the team members list from the server
+            }
+        } catch(err: any) {
+            console.error('Error sending invitation:', err);
+            
+            if (err.response) {
+                console.error('Error response data:', err.response.data);
+                console.error('Error response status:', err.response.status);
+                console.error('Error response headers:', err.response.headers);
+                
+                // Get the error message from the response
+                const errorMessage = err.response.data?.message || 
+                                   err.response.data?.error || 
+                                   'Failed to send invitation';
+                
+                enqueueSnackbar(errorMessage, { variant: "error" });
+                
+                // If the error is due to authentication issues, you might want to handle it specially
+                if (err.response.status === 401) {
+                    enqueueSnackbar('Your session has expired. Please log in again.', { variant: "warning" });
+                }
+            } else if (err.request) {
+                console.error('Error request:', err.request);
+                enqueueSnackbar('No response from server. Please check your connection.', { variant: "error" });
+            } else {
+                enqueueSnackbar(err.message || 'An unexpected error occurred', { variant: "error" });
+            }
+            
+            // Re-throw the error so the modal knows the submission failed
+            throw err;
+        } finally {
+            setIsInviting(false); // Set loading to false regardless of outcome
         }
-    }
-};
+    };
 
     const handleRoleChange = (memberId: string, newRole: TeamMember['role']) => {
         setTeamMembers(prev => prev.map(member => 
@@ -1604,17 +1586,32 @@ const TaskModal: React.FC<{
 
 const InviteModal: React.FC<{
     darkMode: boolean;
-    onInvite: (email: string, role: TeamMember['role']) => void;
+    onInvite: (email: string, role: TeamMember['role']) => Promise<void> | void;
     onClose: () => void;
-}> = ({ darkMode, onClose, onInvite }) => {
+    isInviting?: boolean; // Add this prop
+}> = ({ darkMode, onClose, onInvite, isInviting = false }) => {
     const [email, setEmail] = useState('');
     const [role, setRole] = useState<TeamMember['role']>('Member');
+    const [localIsInviting, setLocalIsInviting] = useState(false);
 
-    const inviteMember = (e: React.FormEvent) => {
+    const inviteMember = async (e: React.FormEvent) => {
         e.preventDefault();
-        console.log('Invite form submitted with:', { email, role }); // Add this debug line
-        onInvite(email, role);
+        console.log('Invite form submitted with:', { email, role });
+        
+        setLocalIsInviting(true);
+        try {
+            await onInvite(email, role);
+            // Only close if the invitation was successful
+            // The parent component should handle closing the modal on success
+        } catch (error) {
+            console.error('Invitation failed:', error);
+            // Keep the modal open on error so user can try again
+        } finally {
+            setLocalIsInviting(false);
+        }
     };
+
+    const isSubmitting = localIsInviting || isInviting;
 
     return (
         <motion.div
@@ -1645,12 +1642,13 @@ const InviteModal: React.FC<{
                             required
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
+                            disabled={isSubmitting}
                             placeholder="colleague@company.com"
                             className={`w-full px-4 py-2 rounded-lg border ${
                                 darkMode 
                                     ? 'bg-gray-700 border-gray-600 text-white' 
                                     : 'bg-gray-50 border-gray-200 text-gray-800'
-                            } focus:outline-none focus:ring-2 focus:ring-[#6747ce]`}
+                            } focus:outline-none focus:ring-2 focus:ring-[#6747ce] disabled:opacity-50 disabled:cursor-not-allowed`}
                         />
                     </div>
                     
@@ -1661,11 +1659,12 @@ const InviteModal: React.FC<{
                         <select
                             value={role}
                             onChange={(e) => setRole(e.target.value as TeamMember['role'])}
+                            disabled={isSubmitting}
                             className={`w-full px-4 py-2 rounded-lg border ${
                                 darkMode 
                                     ? 'bg-gray-700 border-gray-600 text-white' 
                                     : 'bg-gray-50 border-gray-200 text-gray-800'
-                            } focus:outline-none focus:ring-2 focus:ring-[#6747ce]`}
+                            } focus:outline-none focus:ring-2 focus:ring-[#6747ce] disabled:opacity-50 disabled:cursor-not-allowed`}
                         >
                             <option value="Member">Member</option>
                             <option value="Admin">Admin</option>
@@ -1682,19 +1681,31 @@ const InviteModal: React.FC<{
                         <button
                             type="button"
                             onClick={onClose}
+                            disabled={isSubmitting}
                             className={`flex-1 py-2 rounded-lg border ${
                                 darkMode 
                                     ? 'border-gray-600 text-gray-300 hover:bg-gray-700' 
                                     : 'border-gray-200 text-gray-600 hover:bg-gray-50'
-                            } transition-colors`}
+                            } transition-colors disabled:opacity-50 disabled:cursor-not-allowed`}
                         >
                             Cancel
                         </button>
                         <button
                             type="submit"
-                            className="flex-1 bg-gradient-to-r from-[#6747ce] to-[#8b6fe0] text-white py-2 rounded-lg hover:shadow-lg"
+                            disabled={isSubmitting}
+                            className="flex-1 bg-gradient-to-r from-[#6747ce] to-[#8b6fe0] text-white py-2 rounded-lg hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                         >
-                            Send Invite
+                            {isSubmitting ? (
+                                <>
+                                    <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                    <span>Sending...</span>
+                                </>
+                            ) : (
+                                'Send Invite'
+                            )}
                         </button>
                     </div>
                 </form>
@@ -1702,6 +1713,7 @@ const InviteModal: React.FC<{
         </motion.div>
     );
 };
+
 
 const BulkEditModal: React.FC<{
     darkMode: boolean;
